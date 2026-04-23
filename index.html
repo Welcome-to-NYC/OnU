@@ -263,6 +263,15 @@
     opacity: 0.6;
   }
 
+  .platform-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.22em;
+    font-weight: 300;
+    text-transform: uppercase;
+    margin-top: -4px;
+  }
+
   .hero-scroll {
     position: absolute;
     bottom: 48px;
@@ -1198,6 +1207,7 @@
       <span class="btn-pending"
             data-ko="출시 대기중"
             data-en="Coming soon">출시 대기중</span>
+      <span class="platform-hint">iPhone &middot; Mac</span>
     </div>
     <div class="hero-scroll" data-ko="scroll" data-en="scroll">scroll</div>
   </section>
@@ -1369,12 +1379,13 @@
         data-ko="적어두고 싶었던 거,&lt;br&gt;그냥 적어보세요."
         data-en="Just write down&lt;br&gt;what you've been meaning to.">적어두고 싶었던 거,<br>그냥 적어보세요.</h2>
     <p class="final-sub"
-       data-ko="OnU는 무료예요."
-       data-en="OnU is free.">OnU는 무료예요.</p>
+       data-ko="2주는 그냥 써봐요."
+       data-en="Just try it free for 2 weeks.">2주는 그냥 써봐요.</p>
     <div class="hero-cta">
       <span class="btn-pending"
             data-ko="출시 대기중"
             data-en="Coming soon">출시 대기중</span>
+      <span class="platform-hint">iPhone &middot; Mac</span>
     </div>
   </div>
 
@@ -1417,6 +1428,7 @@
       'demo.swipe.toSomeday': '언젠가로 →',
       'demo.swipe.markDone': '완료 →',
       'demo.swipe.toToday': '← 하다',
+      'demo.swipe.restore': '← 언젠가',
       'demo.someday.placeholder': '할일 추가…',
       'demo.memo.placeholder': '메모 추가…',
       'demo.memo.empty': '메모를 적어보세요.',
@@ -1455,6 +1467,7 @@
       'demo.swipe.toSomeday': 'To Someday →',
       'demo.swipe.markDone': 'Done →',
       'demo.swipe.toToday': '← To do',
+      'demo.swipe.restore': '← Someday',
       'demo.someday.placeholder': 'Add task…',
       'demo.memo.placeholder': 'Add memo…',
       'demo.memo.empty': 'Jot down a memo.',
@@ -1714,7 +1727,7 @@
 
   function renderDoneRow(it) {
     const hasMemos = (it.memos || []).length > 0;
-    return `
+    const inner = `
       <div class="demo-done-item ${hasMemos ? 'has-memos' : ''}" data-id="${it.id}" data-list="done">
         <div class="demo-done-dot"></div>
         <div class="demo-done-body" data-act="open">${escapeHtml(it.text)}</div>
@@ -1722,6 +1735,17 @@
           <div class="demo-hover-action" data-act="restore">${t('demo.action.restore')}</div>
         </div>
       </div>`;
+    if (isMobileViewport()) {
+      return `
+        <div class="demo-swipe-wrap" data-id="${it.id}" data-list="done">
+          <div class="demo-swipe-bg">
+            <span></span>
+            <span class="demo-swipe-bg-right">${t('demo.swipe.restore')}</span>
+          </div>
+          <div class="demo-swipe-inner">${inner}</div>
+        </div>`;
+    }
+    return inner;
   }
 
   function renderDemo() {
@@ -2058,6 +2082,7 @@
         else snapBack();
       } else if (dx < -threshold && allowRight) {
         if (list === 'someday') flyAndRun(-1, () => promoteToToday(id));
+        else if (list === 'done') flyAndRun(-1, () => restoreFromDone(id));
         else snapBack();
       } else {
         snapBack();
