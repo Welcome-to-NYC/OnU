@@ -1,0 +1,2285 @@
+<!DOCTYPE html>
+<html lang="ko" data-lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OnU</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@200;300;400&family=IBM+Plex+Sans+KR:wght@200;300;400&display=swap" rel="stylesheet">
+<script>
+  // Apply saved theme before paint to avoid a light/dark flash.
+  (function () {
+    try {
+      var saved = localStorage.getItem('onu.theme');
+      var root = document.documentElement;
+      if (saved === 'light' || saved === 'dark') {
+        root.setAttribute('data-theme', saved);
+      }
+      if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+        root.classList.add('theme-light-pref');
+      }
+    } catch (e) {}
+  })();
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0e10;
+    --text: #e8e6e1;
+    --text-secondary: #9a9895;
+    --text-muted: #6a6865;
+    --text-dim: #4a4845;
+    --text-faint: #2e2c2a;
+    --border: rgba(255, 255, 255, 0.05);
+    --accent: #b8b6b1;
+    --preview-bg: #141416;
+    --preview-border: rgba(255, 255, 255, 0.06);
+    --demo-divider: rgba(255, 255, 255, 0.04);
+    --demo-strike: #e8e6e1;
+    --demo-scroll-thumb: #40403e;
+  }
+
+  /* Light values, shared between system preference and manual override. */
+  :root[data-theme="light"],
+  :root.theme-light-pref:not([data-theme="dark"]) {
+    --bg: #F0EDE8;
+    --text: #1a1918;
+    --text-secondary: #5a5855;
+    --text-muted: #8a8782;
+    --text-dim: #b0ada7;
+    --text-faint: #d0cdc7;
+    --border: rgba(0, 0, 0, 0.05);
+    --accent: #4a4845;
+    --preview-bg: #E8E4DD;
+    --preview-border: rgba(0, 0, 0, 0.06);
+    --demo-divider: rgba(0, 0, 0, 0.06);
+    --demo-strike: #2c2a28;
+    --demo-scroll-thumb: rgba(0, 0, 0, 0.18);
+  }
+
+  /* Smooth crossfade between themes. The class is added briefly during a
+     toggle so every colour, border, background animates together. */
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition: background-color 0.35s ease,
+                color 0.35s ease,
+                border-color 0.35s ease,
+                fill 0.35s ease,
+                stroke 0.35s ease !important;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 300;
+    line-height: 1.8;
+    overflow-x: hidden;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+
+  [data-lang="en"] body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  }
+
+  .serif {
+    font-family: 'Noto Serif KR', serif;
+  }
+
+  [data-lang="en"] .serif {
+    font-family: 'Instrument Serif', 'Noto Serif KR', serif;
+    font-weight: 400;
+  }
+
+  .top-nav {
+    position: fixed;
+    top: 24px;
+    right: 32px;
+    z-index: 10;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+
+  .lang-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: inherit;
+    padding: 4px 0;
+    transition: color 0.2s;
+  }
+
+  .lang-btn.active { color: var(--text); }
+  .lang-btn:hover { color: var(--text); }
+
+  .lang-sep {
+    color: var(--text-faint);
+  }
+
+  .theme-toggle {
+    background: none;
+    border: none;
+    padding: 4px;
+    margin-left: 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+
+  .theme-toggle:hover { color: var(--text); }
+
+  .theme-toggle svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+  }
+
+  /* Show the icon that matches the destination of a click:
+     sun when currently dark (click → light), moon when currently light. */
+  .theme-toggle .icon-sun,
+  .theme-toggle .icon-moon { display: none; }
+  .theme-toggle[data-mode="dark"] .icon-sun { display: block; }
+  .theme-toggle[data-mode="light"] .icon-moon { display: block; }
+
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0 24px;
+    position: relative;
+  }
+
+  .hero-logo {
+    font-size: clamp(72px, 13vw, 150px);
+    font-weight: 200;
+    letter-spacing: -0.05em;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeUp 1.2s ease 0.2s forwards;
+    line-height: 1;
+  }
+
+  [data-lang="en"] .hero-logo {
+    font-style: italic;
+  }
+
+  .hero-tagline {
+    font-size: clamp(16px, 2.2vw, 19px);
+    font-weight: 300;
+    color: var(--text-secondary);
+    letter-spacing: 0.01em;
+    margin-bottom: 72px;
+    opacity: 0;
+    animation: fadeUp 1.2s ease 0.5s forwards;
+    text-align: center;
+  }
+
+  .hero-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    opacity: 0;
+    animation: fadeUp 1.2s ease 0.8s forwards;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 38px;
+    border-radius: 100px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-decoration: none;
+    border: none;
+  }
+
+  .btn-primary {
+    background: var(--text);
+    color: var(--bg);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    opacity: 0.9;
+  }
+
+  .btn-text {
+    color: var(--text-muted);
+    font-size: 13px;
+    text-decoration: none;
+    transition: color 0.2s;
+    padding: 4px;
+  }
+
+  .btn-text:hover { color: var(--text); }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 48px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.3em;
+    opacity: 0;
+    animation: fadeUp 1.2s ease 1.2s forwards;
+    text-transform: uppercase;
+  }
+
+  .hero-scroll::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 40px;
+    background: var(--text-dim);
+    margin: 14px auto 0;
+    animation: scrollPulse 2.5s ease infinite;
+  }
+
+  section.block {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 140px 24px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.24em;
+    margin-bottom: 44px;
+    text-transform: lowercase;
+  }
+
+  .section-title {
+    font-size: clamp(26px, 4.5vw, 40px);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1.4;
+    margin-bottom: 40px;
+  }
+
+  [data-lang="en"] .section-title {
+    font-weight: 400;
+  }
+
+  .section-body {
+    font-size: 16px;
+    color: var(--text-secondary);
+    line-height: 2;
+  }
+
+  .section-body p {
+    margin-bottom: 24px;
+  }
+
+  .section-body p:last-child { margin-bottom: 0; }
+
+  .section-body em {
+    color: var(--text);
+    font-style: normal;
+    font-weight: 400;
+  }
+
+  .divider {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .divider-line {
+    width: 40px;
+    height: 1px;
+    background: var(--text-faint);
+  }
+
+  /* ───── INTERACTIVE DEMO ───── */
+  .demo-section {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 120px 24px;
+  }
+
+  .demo-window {
+    background: var(--preview-bg);
+    border-radius: 14px;
+    border: 1px solid var(--preview-border);
+    overflow: hidden;
+    width: 100%;
+    max-width: 880px;
+    margin: 0 auto 24px;
+    box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.15);
+    position: relative;
+    transition: max-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+                border-radius 0.4s ease;
+  }
+
+  .demo-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    max-height: 60px;
+    overflow: hidden;
+    opacity: 1;
+    transition: max-height 0.4s ease,
+                opacity 0.3s ease,
+                padding 0.4s ease,
+                border-color 0.35s ease;
+  }
+
+  .demo-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+
+  .demo-stage {
+    padding: 36px 56px 32px;
+    min-height: 440px;
+    display: flex;
+    flex-direction: column;
+    transition: padding 0.4s ease, min-height 0.4s ease;
+  }
+
+  .demo-header {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+  }
+
+  .demo-hint {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+
+  .demo-hint kbd {
+    font-family: inherit;
+    padding: 2px 5px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin: 0 2px;
+  }
+
+  .demo-views {
+    flex: 1;
+    position: relative;
+    min-height: 320px;
+  }
+
+  .demo-view {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+  }
+
+  .demo-view.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .demo-view::-webkit-scrollbar { width: 3px; }
+  .demo-view::-webkit-scrollbar-thumb {
+    background: var(--demo-scroll-thumb);
+    border-radius: 2px;
+  }
+  .demo-view::-webkit-scrollbar-track { background: transparent; }
+
+  .demo-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 60px 0 20px;
+    font-weight: 300;
+  }
+
+  .demo-empty-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 10px;
+  }
+
+  /* TODAY */
+  .demo-task {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--demo-divider);
+    transition: opacity 0.5s ease;
+    position: relative;
+  }
+
+  .demo-task:last-child { border-bottom: none; }
+
+  .demo-check {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid var(--text-muted);
+    flex-shrink: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    background: transparent;
+  }
+
+  .demo-check:hover { border-color: var(--accent); }
+
+  .demo-check.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .demo-check.checked::after {
+    content: '';
+    width: 7px;
+    height: 3.5px;
+    border-left: 1.5px solid var(--bg);
+    border-bottom: 1.5px solid var(--bg);
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  .demo-task-body {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    cursor: default;
+    min-width: 0;
+  }
+
+  .demo-num {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+    min-width: 14px;
+  }
+
+  .demo-text {
+    font-size: 21px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    position: relative;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: font-size 0.4s ease;
+  }
+
+  .demo-text::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 1.5px;
+    width: 0;
+    background: var(--demo-strike);
+    transition: width 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  .demo-task.done { opacity: 0.35; }
+  .demo-task.done .demo-text::after { width: 100%; }
+
+  .demo-hover-actions {
+    display: flex;
+    gap: 14px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .demo-task:hover .demo-hover-actions,
+  .demo-someday-item:hover .demo-hover-actions,
+  .demo-done-item:hover .demo-hover-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .demo-hover-action {
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+
+  .demo-hover-action:hover { color: var(--text); }
+
+  /* SOMEDAY */
+  .demo-section-title {
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 0.14em;
+    margin-bottom: 16px;
+    text-transform: lowercase;
+  }
+
+  .demo-someday-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--demo-divider);
+    font-size: 16px;
+    font-weight: 300;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .demo-someday-item:last-child { border-bottom: none; }
+
+  .demo-someday-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    border: 1px solid var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .demo-someday-body {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .demo-someday-input-wrap {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--demo-divider);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .demo-someday-input-wrap .demo-plus {
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  .demo-someday-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+    padding: 4px 0;
+  }
+
+  .demo-someday-input::placeholder {
+    color: var(--text-dim);
+  }
+
+  /* DONE */
+  .demo-done-group { margin-bottom: 22px; }
+  .demo-done-group:last-child { margin-bottom: 0; }
+
+  .demo-done-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.16em;
+    margin-bottom: 10px;
+    text-transform: lowercase;
+  }
+
+  .demo-done-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .demo-done-item .demo-done-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .demo-done-body {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* NAV */
+  .demo-nav {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    padding: 18px 0 6px;
+    border-top: 1px solid var(--demo-divider);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    margin-top: 16px;
+    transition: padding 0.4s ease, gap 0.4s ease;
+  }
+
+  .demo-nav-item {
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 6px 0;
+    transition: color 0.2s ease;
+    text-transform: lowercase;
+  }
+
+  .demo-nav-item.active { color: var(--text); }
+  .demo-nav-item:hover:not(.active) { color: var(--text-secondary); }
+
+  .demo-caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+
+  /* Viewport mode toggle (Desktop / Mobile) */
+  .demo-viewport-toggle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0 12px;
+  }
+  .viewport-btn {
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+  .viewport-btn:hover { color: var(--text-secondary); }
+  .viewport-btn.active { color: var(--text); }
+  .viewport-sep { color: var(--text-faint); font-size: 11px; }
+
+  /* Task body click affordance — the whole text row opens the memo canvas */
+  .demo-task-body, .demo-someday-body, .demo-done-body {
+    cursor: pointer;
+  }
+  .demo-task-body:hover .demo-text,
+  .demo-someday-item:hover .demo-someday-body,
+  .demo-done-item:hover .demo-done-body {
+    opacity: 0.75;
+  }
+
+  /* Memo dot (someday/done items that have memos) */
+  .demo-someday-item.has-memos .demo-someday-dot {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .demo-done-item.has-memos .demo-done-dot {
+    background: var(--accent);
+    width: 4px;
+    height: 4px;
+  }
+
+  /* ─── CANVAS (memo) VIEW ─── */
+  .demo-canvas-back {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    transition: color 0.2s ease;
+    align-self: flex-start;
+    margin-bottom: 18px;
+  }
+  .demo-canvas-back:hover { color: var(--text); }
+
+  .demo-canvas-title {
+    font-size: 24px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.35;
+    outline: none;
+    caret-color: var(--text);
+  }
+  .demo-canvas-title[contenteditable="true"] { cursor: text; }
+  .demo-canvas-title[contenteditable="true"]:hover { color: var(--text); }
+  .demo-canvas-title[contenteditable="true"]:focus { color: var(--text); }
+
+  .demo-canvas-underline {
+    width: 50px;
+    height: 1px;
+    background: var(--text-dim);
+    margin-bottom: 24px;
+  }
+
+  .demo-memo-list { margin-bottom: 8px; }
+
+  .demo-memo {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 0;
+    font-size: 15px;
+    font-weight: 300;
+    color: var(--text-secondary);
+    letter-spacing: -0.01em;
+    line-height: 1.55;
+  }
+
+  .demo-memo .demo-memo-bullet {
+    color: var(--text-dim);
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .demo-memo-text {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .demo-memo-delete {
+    opacity: 0;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    transition: opacity 0.15s ease, color 0.2s ease;
+    flex-shrink: 0;
+  }
+  .demo-memo:hover .demo-memo-delete { opacity: 1; }
+  .demo-memo-delete:hover { color: var(--text); }
+
+  /* Suppress iOS Safari's native long-press callout / text selection on
+     task rows so our custom context menu is the only thing that appears. */
+  .demo-task, .demo-someday-item, .demo-done-item {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Row context menu (right-click on desktop, long-press on mobile).
+     Mirrors the Tauri app's ctx-menu — small floating "Delete" anchored
+     to the pointer. */
+  .demo-ctx-menu {
+    position: fixed;
+    background: var(--preview-bg);
+    border: 1px solid var(--demo-divider);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+    min-width: 120px;
+    z-index: 1000;
+    display: none;
+    font-size: 12px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+  }
+  .demo-ctx-menu.visible { display: block; }
+  .demo-ctx-item {
+    padding: 8px 14px;
+    cursor: pointer;
+    border-radius: 5px;
+    color: var(--text-secondary);
+    user-select: none;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .demo-ctx-item.danger:hover,
+  .demo-ctx-item.danger:active {
+    background: rgba(200, 60, 60, 0.12);
+    color: rgb(220, 80, 80);
+  }
+
+  .demo-memo-input-wrap {
+    margin-top: 6px;
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .demo-memo-input-wrap .demo-memo-bullet {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  .demo-memo-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+    padding: 0;
+  }
+
+  .demo-memo-input::placeholder { color: var(--text-dim); }
+
+  .demo-canvas-empty {
+    font-size: 13px;
+    color: var(--text-dim);
+    padding: 4px 0 8px;
+    font-style: normal;
+  }
+
+  /* Mobile-specific swipe UI */
+  .demo-swipe-wrap {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .demo-swipe-bg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    pointer-events: none;
+  }
+
+  .demo-swipe-bg-left, .demo-swipe-bg-right {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .demo-swipe-inner {
+    position: relative;
+    background: var(--preview-bg);
+    will-change: transform;
+    touch-action: pan-y;
+  }
+
+  /* Mobile layout adjustments */
+  @media (max-width: 760px) {
+    .demo-section { padding: 80px 16px; }
+
+    .demo-window {
+      border-radius: 22px;
+      max-width: 420px;
+    }
+
+    .demo-titlebar {
+      max-height: 0;
+      opacity: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-bottom-color: transparent;
+    }
+
+    .demo-stage {
+      padding: 26px 24px 18px;
+      min-height: 620px;
+    }
+
+    .demo-header .demo-hint { display: none; }
+
+    .demo-text { font-size: 20px; }
+
+    .demo-hover-actions { display: none !important; }
+
+    .demo-nav {
+      padding: 16px 0 4px;
+      gap: 24px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .demo-section { padding: 70px 12px; }
+    .demo-window { border-radius: 20px; }
+    .demo-stage { padding: 20px 18px 14px; }
+    .demo-text { font-size: 18px; }
+    .demo-num { min-width: 12px; }
+  }
+
+  /* Force mobile look on any viewport */
+  .demo-section.force-mobile .demo-window {
+    border-radius: 22px;
+    max-width: 420px;
+  }
+  .demo-section.force-mobile .demo-titlebar {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+  }
+  .demo-section.force-mobile .demo-stage {
+    padding: 26px 24px 18px;
+    min-height: 620px;
+  }
+  .demo-section.force-mobile .demo-header .demo-hint { display: none; }
+  .demo-section.force-mobile .demo-text { font-size: 20px; }
+  .demo-section.force-mobile .demo-hover-actions { display: none !important; }
+  .demo-section.force-mobile .demo-nav { padding: 16px 0 4px; gap: 24px; }
+
+  /* Force desktop look on narrow viewport */
+  @media (max-width: 760px) {
+    .demo-section.force-desktop .demo-window {
+      border-radius: 14px;
+      max-width: 880px;
+    }
+    .demo-section.force-desktop .demo-titlebar {
+      max-height: 60px;
+      opacity: 1;
+      padding-top: 14px;
+      padding-bottom: 14px;
+      border-bottom-color: var(--border);
+    }
+    .demo-section.force-desktop .demo-stage {
+      padding: 36px 56px 32px;
+      min-height: 440px;
+    }
+    .demo-section.force-desktop .demo-header .demo-hint { display: inline; }
+    .demo-section.force-desktop .demo-text { font-size: 21px; }
+    .demo-section.force-desktop .demo-hover-actions { display: flex !important; }
+    .demo-section.force-desktop .demo-nav { padding: 18px 0 6px; gap: 30px; }
+  }
+
+  /* ───── PRINCIPLES ───── */
+  .principles {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 140px 24px;
+  }
+
+  .principle {
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .principle:last-child { border-bottom: none; }
+
+  .principle-mark {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .principle h3 {
+    font-size: 20px;
+    font-weight: 400;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .principle p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.9;
+  }
+
+  .quote-section {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 160px 24px;
+    text-align: center;
+  }
+
+  .quote {
+    font-size: clamp(22px, 3.8vw, 30px);
+    font-weight: 300;
+    line-height: 1.6;
+    letter-spacing: -0.01em;
+    color: var(--text-secondary);
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  [data-lang="en"] .quote {
+    font-weight: 400;
+    font-style: italic;
+  }
+
+  .quote em {
+    color: var(--text);
+    font-style: normal;
+    font-weight: 400;
+  }
+
+  .final-cta {
+    text-align: center;
+    padding: 180px 24px;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .final-title {
+    font-size: clamp(32px, 6vw, 56px);
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+    line-height: 1.3;
+  }
+
+  .final-sub {
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-bottom: 56px;
+    line-height: 1.7;
+  }
+
+  footer {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 40px 24px 64px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  footer a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  footer a:hover { color: var(--text); }
+
+  .footer-links { display: flex; gap: 28px; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.3; transform: scaleY(1); }
+    50% { opacity: 0.7; transform: scaleY(1.15); }
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (max-width: 640px) {
+    .top-nav { top: 18px; right: 20px; }
+
+    section.block, .principles, .quote-section, .final-cta {
+      padding-top: 100px;
+      padding-bottom: 100px;
+    }
+
+    footer {
+      flex-direction: column;
+      gap: 16px;
+      text-align: center;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <nav class="top-nav">
+    <button class="lang-btn active" data-lang-btn="ko">한국어</button>
+    <span class="lang-sep">·</span>
+    <button class="lang-btn" data-lang-btn="en">English</button>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" data-mode="dark">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+      </svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
+  </nav>
+
+  <section class="hero">
+    <h1 class="hero-logo serif">OnU</h1>
+    <p class="hero-tagline"
+       data-ko="세상에서 가장 미니멀한 할 일 앱"
+       data-en="The world's most minimal to-do app">세상에서 가장 미니멀한 할 일 앱</p>
+    <div class="hero-cta">
+      <a href="#" class="btn btn-primary"
+         data-ko="아이폰으로 받기"
+         data-en="Get it for iPhone">아이폰으로 받기</a>
+      <a href="#" class="btn-text"
+         data-ko="맥에서도 써요 →"
+         data-en="Also on Mac →">맥에서도 써요 →</a>
+    </div>
+    <div class="hero-scroll" data-ko="scroll" data-en="scroll">scroll</div>
+  </section>
+
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <section class="block reveal">
+    <div class="section-label" data-ko="이런 순간" data-en="you know the feeling">이런 순간</div>
+    <h2 class="section-title serif"
+        data-ko="그냥 한 줄&lt;br&gt;적어두고 싶을 뿐인데."
+        data-en="You just want to&lt;br&gt;write it down.">그냥 한 줄<br>적어두고 싶을 뿐인데.</h2>
+    <div class="section-body">
+      <p data-ko="자꾸 더 물어봐요. 언제까지, 어느 카테고리, 우선순위는 어떻게 할지."
+         data-en="But it keeps asking. By when, which category, what priority.">자꾸 더 물어봐요. 언제까지, 어느 카테고리, 우선순위는 어떻게 할지.</p>
+      <p data-ko="그러다 안 적게 돼요."
+         data-en="So you stop writing it down.">그러다 안 적게 돼요.</p>
+      <p data-ko="OnU는 아무것도 안 물어봐요. 그냥 적으면 돼요."
+         data-en="OnU asks nothing. Just write it.">OnU는 아무것도 안 물어봐요. 그냥 적으면 돼요.</p>
+    </div>
+  </section>
+
+  <!-- ───── INTERACTIVE DEMO ───── -->
+  <div class="demo-section reveal">
+    <div class="demo-window" id="demo-window">
+      <div class="demo-titlebar">
+        <div class="demo-dot"></div>
+        <div class="demo-dot"></div>
+        <div class="demo-dot"></div>
+      </div>
+      <div class="demo-stage">
+        <div class="demo-header">
+          <span id="demo-date"></span>
+          <span class="demo-hint" id="demo-hint"></span>
+        </div>
+
+        <div class="demo-views">
+          <div class="demo-view active" id="demo-view-today"></div>
+          <div class="demo-view" id="demo-view-someday"></div>
+          <div class="demo-view" id="demo-view-done"></div>
+          <div class="demo-view" id="demo-view-canvas"></div>
+        </div>
+
+        <div class="demo-nav">
+          <span class="demo-nav-item active" data-view="today"
+                data-ko="하다" data-en="to do">하다</span>
+          <span class="demo-nav-item" data-view="someday"
+                data-ko="언젠가" data-en="someday">언젠가</span>
+          <span class="demo-nav-item" data-view="done"
+                data-ko="했다" data-en="done">했다</span>
+        </div>
+      </div>
+    </div>
+    <div class="demo-viewport-toggle" role="tablist" aria-label="Viewport mode">
+      <button class="viewport-btn" data-viewport="desktop"
+              data-ko="데스크톱" data-en="Desktop">데스크톱</button>
+      <span class="viewport-sep">·</span>
+      <button class="viewport-btn" data-viewport="mobile"
+              data-ko="모바일" data-en="Mobile">모바일</button>
+    </div>
+    <div class="demo-caption"
+         data-ko="직접 해보세요. 체크하고, 글자를 눌러 고치거나 메모를 남겨보세요."
+         data-en="Try it. Tap to check off, or tap a task to edit it or leave a memo.">직접 해보세요. 체크하고, 글자를 눌러 고치거나 메모를 남겨보세요.</div>
+  </div>
+
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <section class="block reveal">
+    <div class="section-label" data-ko="공간은 셋" data-en="three places">공간은 셋</div>
+    <h2 class="section-title serif"
+        data-ko="하다 / 언젠가 / 했다"
+        data-en="To do / Someday / Done">하다 / 언젠가 / 했다</h2>
+    <div class="section-body">
+      <p data-ko="&lt;em&gt;하다&lt;/em&gt;는 오늘이나 내일, 혹은 당장 하려는 것들."
+         data-en="&lt;em&gt;To do&lt;/em&gt; is for today or tomorrow — or right now."><em>하다</em>는 오늘이나 내일, 혹은 당장 하려는 것들.</p>
+      <p data-ko="&lt;em&gt;언젠가&lt;/em&gt;는 지금 말고 언젠가 해야 할 일들."
+         data-en="&lt;em&gt;Someday&lt;/em&gt; is for later, not now."><em>언젠가</em>는 지금 말고 언젠가 해야 할 일들.</p>
+      <p data-ko="&lt;em&gt;했다&lt;/em&gt;는 끝낸 일들이 쌓이는 곳."
+         data-en="&lt;em&gt;Done&lt;/em&gt; is where finished things pile up."><em>했다</em>는 끝낸 일들이 쌓이는 곳.</p>
+      <p data-ko="이게 전부예요."
+         data-en="That's all there is.">이게 전부예요.</p>
+    </div>
+  </section>
+
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <section class="block reveal">
+    <div class="section-label" data-ko="빠른 접근" data-en="quick access">빠른 접근</div>
+    <h2 class="section-title serif"
+        data-ko="잠금화면에서&lt;br&gt;바로 보여요."
+        data-en="Right on your&lt;br&gt;lock screen.">잠금화면에서<br>바로 보여요.</h2>
+    <div class="section-body">
+      <p data-ko="열어보려고 앱이 어딨지 찾을 필요도 없어요."
+         data-en="No hunting for the app icon.">열어보려고 앱이 어딨지 찾을 필요도 없어요.</p>
+      <p data-ko="&lt;em&gt;잠금화면&lt;/em&gt;, &lt;em&gt;제어센터&lt;/em&gt; 위젯으로 꺼내보면 돼요."
+         data-en="&lt;em&gt;Lock screen&lt;/em&gt; and &lt;em&gt;Control Center&lt;/em&gt; widgets have it ready."><em>잠금화면</em>, <em>제어센터</em> 위젯으로 꺼내보면 돼요.</p>
+    </div>
+  </section>
+
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <div class="principles">
+    <div class="section-label reveal" data-ko="OnU는 이런 걸 안 해요" data-en="things OnU doesn't do">OnU는 이런 걸 안 해요</div>
+
+    <div class="principle reveal">
+      <div class="principle-mark">01</div>
+      <h3 data-ko="그대로 둬도 돼요" data-en="you can leave it be">그대로 둬도 돼요</h3>
+      <p data-ko="체크하면 자정에 '했다'로 넘어가요. 체크 안 하면 그대로 남아있어요."
+         data-en="Check it, and it moves to 'done' at midnight. Leave it, and it stays.">체크하면 자정에 '했다'로 넘어가요. 체크 안 하면 그대로 남아있어요.</p>
+    </div>
+
+    <div class="principle reveal">
+      <div class="principle-mark">02</div>
+      <h3 data-ko="할 일 한 줄이면 끝" data-en="one line is all">할 일 한 줄이면 끝</h3>
+      <p data-ko="태그도, 카테고리도, 우선순위도 없어요. 할 일 한 줄만 적으면 돼요."
+         data-en="No tags, no categories, no priorities. Just write a line.">태그도, 카테고리도, 우선순위도 없어요. 할 일 한 줄만 적으면 돼요.</p>
+    </div>
+
+    <div class="principle reveal">
+      <div class="principle-mark">03</div>
+      <h3 data-ko="조용해요" data-en="no noise">조용해요</h3>
+      <p data-ko="알림 안 보내요. 뱃지 숫자도 없어요. 당신이 열 때만 거기 있어요."
+         data-en="No notifications. No badge numbers. It's there when you open it. Not before.">알림 안 보내요. 뱃지 숫자도 없어요. 당신이 열 때만 거기 있어요.</p>
+    </div>
+
+    <div class="principle reveal">
+      <div class="principle-mark">04</div>
+      <h3 data-ko="생각나면 바로 적으면 돼요" data-en="just write it down">생각나면 바로 적으면 돼요</h3>
+      <p data-ko="떠오를 때 한 줄 적어두면 돼요. 언제 할지는 나중에 정해도 되고요."
+         data-en="Jot down a line when it comes to mind. Decide when to do it later.">떠오를 때 한 줄 적어두면 돼요. 언제 할지는 나중에 정해도 되고요.</p>
+    </div>
+
+    <div class="principle reveal">
+      <div class="principle-mark">05</div>
+      <h3 data-ko="기기끼리 알아서 맞춰요" data-en="your devices stay in sync">기기끼리 알아서 맞춰요</h3>
+      <p data-ko="아이폰에서 적은 게 맥에도 있어요. 아이클라우드가 조용히 해줘요. 로그인도 필요 없어요."
+         data-en="Write on iPhone, find it on Mac. iCloud handles it quietly. No login needed.">아이폰에서 적은 게 맥에도 있어요. 아이클라우드가 조용히 해줘요. 로그인도 필요 없어요.</p>
+    </div>
+  </div>
+
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <div class="quote-section reveal">
+    <p class="quote serif"
+       data-ko="잊어도 괜찮아요.&lt;br&gt;&lt;em&gt;OnU는 기억해요.&lt;/em&gt;"
+       data-en="It's okay to forget.&lt;br&gt;&lt;em&gt;OnU remembers.&lt;/em&gt;">잊어도 괜찮아요.<br><em>OnU는 기억해요.</em></p>
+  </div>
+
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <section class="block reveal">
+    <div class="section-label" data-ko="플랫폼" data-en="platforms">플랫폼</div>
+    <h2 class="section-title serif"
+        data-ko="아이폰에서 주로,&lt;br&gt;맥에서도."
+        data-en="Mostly on iPhone.&lt;br&gt;Also on Mac.">아이폰에서 주로,<br>맥에서도.</h2>
+    <div class="section-body">
+      <p data-ko="&lt;em&gt;아이폰&lt;/em&gt;은 생각났을 때 바로 적는 용도예요."
+         data-en="&lt;em&gt;iPhone&lt;/em&gt; is for catching thoughts the moment they come."><em>아이폰</em>은 생각났을 때 바로 적는 용도예요.</p>
+      <p data-ko="&lt;em&gt;맥&lt;/em&gt;은 자리에 앉아 쌓인 걸 정리할 때 써요."
+         data-en="&lt;em&gt;Mac&lt;/em&gt; is for sitting down and going through what's piled up."><em>맥</em>은 자리에 앉아 쌓인 걸 정리할 때 써요.</p>
+      <p data-ko="아이클라우드가 둘을 알아서 이어줘요."
+         data-en="iCloud keeps the two in sync.">아이클라우드가 둘을 알아서 이어줘요.</p>
+    </div>
+  </section>
+
+  <div class="divider"><div class="divider-line"></div></div>
+
+  <div class="final-cta reveal">
+    <h2 class="final-title serif"
+        data-ko="적어두고 싶었던 거,&lt;br&gt;그냥 적어보세요."
+        data-en="Just write down&lt;br&gt;what you've been meaning to.">적어두고 싶었던 거,<br>그냥 적어보세요.</h2>
+    <p class="final-sub"
+       data-ko="OnU는 무료예요."
+       data-en="OnU is free.">OnU는 무료예요.</p>
+    <div class="hero-cta">
+      <a href="#" class="btn btn-primary"
+         data-ko="아이폰으로 받기"
+         data-en="Get it for iPhone">아이폰으로 받기</a>
+      <a href="#" class="btn-text"
+         data-ko="맥에서도 써요 →"
+         data-en="Also on Mac →">맥에서도 써요 →</a>
+    </div>
+  </div>
+
+  <!-- Row context menu — lives at <body> level because .demo-section has a
+       transform (reveal animation) which would otherwise rebase position:fixed
+       to the section instead of the viewport. -->
+  <div class="demo-ctx-menu" id="demo-ctx-menu">
+    <div class="demo-ctx-item danger" id="demo-ctx-delete">삭제</div>
+  </div>
+
+  <footer>
+    <span>OnU</span>
+    <div class="footer-links">
+      <a href="#">GitHub</a>
+      <a href="#" data-ko="문의" data-en="Contact">문의</a>
+    </div>
+  </footer>
+
+<script>
+  /* ═══════════════════════════════════════════════════════
+     i18n
+     ═══════════════════════════════════════════════════════ */
+  const LANG_KEY = 'onu-lang';
+  const htmlEl = document.documentElement;
+  let currentLang = 'ko';
+
+  const strings = {
+    ko: {
+      'demo.hint.desktop': '클릭해서 체크 · 글자 누르면 메모',
+      'demo.hint.mobile': '좌우로 밀어보세요',
+      'demo.today.empty': '비어 있어요',
+      'demo.today.emptyHint': '언젠가에서 끌어올려보세요',
+      'demo.someday.empty': '비어 있어요',
+      'demo.done.empty': '아직 없어요',
+      'demo.someday.title': '언젠가',
+      'demo.done.title': '했다',
+      'demo.action.toSomeday': '언젠가로 →',
+      'demo.action.toToday': '← 하다',
+      'demo.action.markDone': '했다로 →',
+      'demo.action.restore': '← 언젠가로',
+      'demo.swipe.toSomeday': '언젠가로 →',
+      'demo.swipe.markDone': '완료 →',
+      'demo.swipe.toToday': '← 하다',
+      'demo.someday.placeholder': '할일 추가…',
+      'demo.memo.placeholder': '메모 추가…',
+      'demo.memo.empty': '메모를 적어보세요.',
+      'demo.memo.delete': '삭제',
+      'demo.back.today': '← 하다',
+      'demo.back.someday': '← 언젠가',
+      'demo.back.done': '← 했다',
+      'demo.done.today': '오늘',
+      'demo.done.yesterday': '어제',
+      'demo.seed.today.1': '보고서 초안',
+      'demo.seed.today.2': '클라이언트 회신',
+      'demo.seed.today.3': '미팅 노트 정리',
+      'demo.seed.today.2.memo.1': '2페이지에 수치 포함',
+      'demo.seed.today.2.memo.2': '확정 일정 물어볼 것',
+      'demo.seed.someday.1': '책 읽기',
+      'demo.seed.someday.2': '운동 30분',
+      'demo.seed.someday.3': '친구에게 연락',
+      'demo.seed.someday.4': '방 정리',
+      'demo.seed.someday.1.memo.1': '책장 맨 위 칸부터',
+      'demo.seed.done.1': '이메일 정리',
+      'demo.seed.done.2': '장보기'
+    },
+    en: {
+      'demo.hint.desktop': 'Click to check · Tap text for memos',
+      'demo.hint.mobile': 'Swipe sideways',
+      'demo.today.empty': 'Empty',
+      'demo.today.emptyHint': 'Pull one up from Someday',
+      'demo.someday.empty': 'Empty',
+      'demo.done.empty': 'Nothing yet',
+      'demo.someday.title': 'Someday',
+      'demo.done.title': 'Done',
+      'demo.action.toSomeday': 'To Someday →',
+      'demo.action.toToday': '← To do',
+      'demo.action.markDone': 'Mark Done →',
+      'demo.action.restore': '← To Someday',
+      'demo.swipe.toSomeday': 'To Someday →',
+      'demo.swipe.markDone': 'Done →',
+      'demo.swipe.toToday': '← To do',
+      'demo.someday.placeholder': 'Add task…',
+      'demo.memo.placeholder': 'Add memo…',
+      'demo.memo.empty': 'Jot down a memo.',
+      'demo.memo.delete': 'Delete',
+      'demo.back.today': '← To do',
+      'demo.back.someday': '← Someday',
+      'demo.back.done': '← Done',
+      'demo.done.today': 'Today',
+      'demo.done.yesterday': 'Yesterday',
+      'demo.seed.today.1': 'Draft the report',
+      'demo.seed.today.2': 'Reply to client',
+      'demo.seed.today.3': 'Clean up meeting notes',
+      'demo.seed.today.2.memo.1': 'Include numbers on page 2',
+      'demo.seed.today.2.memo.2': 'Ask about the final date',
+      'demo.seed.someday.1': 'Read a book',
+      'demo.seed.someday.2': '30 min workout',
+      'demo.seed.someday.3': 'Text a friend',
+      'demo.seed.someday.4': 'Tidy the room',
+      'demo.seed.someday.1.memo.1': 'Start from the top shelf',
+      'demo.seed.done.1': 'Clear inbox',
+      'demo.seed.done.2': 'Groceries'
+    }
+  };
+
+  function t(key) {
+    return strings[currentLang]?.[key] ?? strings.en[key] ?? key;
+  }
+
+  function decodeHTML(str) {
+    return str.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  }
+
+  function setLang(lang) {
+    currentLang = lang;
+    htmlEl.setAttribute('data-lang', lang);
+    htmlEl.setAttribute('lang', lang);
+
+    document.querySelectorAll('[data-ko], [data-en]').forEach(el => {
+      const text = el.getAttribute('data-' + lang);
+      if (text !== null) el.innerHTML = decodeHTML(text);
+    });
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-lang-btn') === lang);
+    });
+
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+
+    // Re-seed and re-render demo in new language
+    seedDemo();
+    renderDemo();
+    updateDemoMeta();
+  }
+
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => setLang(btn.getAttribute('data-lang-btn')));
+  });
+
+  let initialLang = 'ko';
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved) initialLang = saved;
+    else initialLang = (navigator.language && navigator.language.startsWith('ko')) ? 'ko' : 'en';
+  } catch (e) {}
+
+  /* ═══════════════════════════════════════════════════════
+     Reveal on scroll
+     ═══════════════════════════════════════════════════════ */
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('visible');
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  /* ═══════════════════════════════════════════════════════
+     Interactive Demo
+     ═══════════════════════════════════════════════════════ */
+  const escapeHtml = (s) => {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  };
+
+  const uid = () => Math.random().toString(36).slice(2, 9);
+
+  const demo = {
+    today: [],
+    someday: [],
+    done: [],
+    view: 'today',
+    canvas: null           // { id, source } when canvas is open
+  };
+
+  function seedDemo() {
+    demo.today = [
+      { id: uid(), text: t('demo.seed.today.1'), done: true, memos: [] },
+      { id: uid(), text: t('demo.seed.today.2'), done: false,
+        memos: [t('demo.seed.today.2.memo.1'), t('demo.seed.today.2.memo.2')] },
+      { id: uid(), text: t('demo.seed.today.3'), done: false, memos: [] }
+    ];
+    demo.someday = [
+      { id: uid(), text: t('demo.seed.someday.1'),
+        memos: [t('demo.seed.someday.1.memo.1')] },
+      { id: uid(), text: t('demo.seed.someday.2'), memos: [] },
+      { id: uid(), text: t('demo.seed.someday.3'), memos: [] },
+      { id: uid(), text: t('demo.seed.someday.4'), memos: [] }
+    ];
+    demo.done = [
+      { id: uid(), text: t('demo.seed.done.1'), when: 'today', memos: [] },
+      { id: uid(), text: t('demo.seed.done.2'), when: 'yesterday', memos: [] }
+    ];
+    demo.canvas = null;
+  }
+
+  // null = follow viewport, 'mobile' | 'desktop' = user override
+  let viewportOverride = null;
+
+  function isMobileViewport() {
+    if (viewportOverride === 'mobile') return true;
+    if (viewportOverride === 'desktop') return false;
+    return window.matchMedia('(max-width: 760px)').matches;
+  }
+
+  function updateDemoMeta() {
+    const dateEl = document.getElementById('demo-date');
+    const hintEl = document.getElementById('demo-hint');
+    const d = new Date();
+    const locale = currentLang === 'ko' ? 'ko-KR' : 'en-US';
+    dateEl.textContent = new Intl.DateTimeFormat(locale, {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    }).format(d);
+
+    if (isMobileViewport()) {
+      hintEl.textContent = t('demo.hint.mobile');
+    } else {
+      hintEl.innerHTML = t('demo.hint.desktop');
+    }
+  }
+
+  /* ─── Render ─── */
+  function renderToday() {
+    const c = document.getElementById('demo-view-today');
+    if (demo.today.length === 0) {
+      c.innerHTML = `<div class="demo-empty">${t('demo.today.empty')}
+        <div class="demo-empty-hint">${t('demo.today.emptyHint')}</div></div>`;
+      return;
+    }
+    c.innerHTML = demo.today.map((it, i) => renderTodayRow(it, i)).join('');
+    bindRowInteractions(c, 'today');
+  }
+
+  function renderTodayRow(it, i) {
+    const num = String(i + 1).padStart(2, '0');
+    const inner = `
+      <div class="demo-task ${it.done ? 'done' : ''}" data-id="${it.id}" data-list="today">
+        <div class="demo-check ${it.done ? 'checked' : ''}" data-act="toggle"></div>
+        <div class="demo-task-body" data-act="open">
+          <div class="demo-num">${num}</div>
+          <div class="demo-text">${escapeHtml(it.text)}</div>
+        </div>
+        <div class="demo-hover-actions">
+          <div class="demo-hover-action" data-act="toSomeday">${t('demo.action.toSomeday')}</div>
+        </div>
+      </div>`;
+    if (isMobileViewport()) {
+      return `
+        <div class="demo-swipe-wrap" data-id="${it.id}" data-list="today">
+          <div class="demo-swipe-bg">
+            <span class="demo-swipe-bg-left">${t('demo.swipe.toSomeday')}</span>
+            <span></span>
+          </div>
+          <div class="demo-swipe-inner">${inner}</div>
+        </div>`;
+    }
+    return inner;
+  }
+
+  function renderSomeday() {
+    const c = document.getElementById('demo-view-someday');
+    const header = `<div class="demo-section-title">${t('demo.someday.title')}</div>`;
+    const input = `
+      <div class="demo-someday-input-wrap">
+        <span class="demo-plus">+</span>
+        <input class="demo-someday-input" id="demo-someday-input"
+               placeholder="${t('demo.someday.placeholder')}" />
+      </div>`;
+    if (demo.someday.length === 0) {
+      c.innerHTML = header + `<div class="demo-empty">${t('demo.someday.empty')}</div>` + input;
+    } else {
+      c.innerHTML = header + demo.someday.map(renderSomedayRow).join('') + input;
+    }
+    bindRowInteractions(c, 'someday');
+    const inp = document.getElementById('demo-someday-input');
+    if (inp) {
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const v = e.target.value.trim();
+          if (v) {
+            demo.someday.unshift({ id: uid(), text: v });
+            e.target.value = '';
+            renderSomeday();
+            document.getElementById('demo-someday-input')?.focus();
+          }
+        }
+      });
+    }
+  }
+
+  function renderSomedayRow(it) {
+    const hasMemos = (it.memos || []).length > 0;
+    const inner = `
+      <div class="demo-someday-item ${hasMemos ? 'has-memos' : ''}" data-id="${it.id}" data-list="someday">
+        <div class="demo-someday-dot"></div>
+        <div class="demo-someday-body" data-act="open">${escapeHtml(it.text)}</div>
+        <div class="demo-hover-actions">
+          <div class="demo-hover-action" data-act="toToday">${t('demo.action.toToday')}</div>
+          <div class="demo-hover-action" data-act="markDone">${t('demo.action.markDone')}</div>
+        </div>
+      </div>`;
+    if (isMobileViewport()) {
+      return `
+        <div class="demo-swipe-wrap" data-id="${it.id}" data-list="someday">
+          <div class="demo-swipe-bg">
+            <span class="demo-swipe-bg-left">${t('demo.swipe.markDone')}</span>
+            <span class="demo-swipe-bg-right">${t('demo.swipe.toToday')}</span>
+          </div>
+          <div class="demo-swipe-inner">${inner}</div>
+        </div>`;
+    }
+    return inner;
+  }
+
+  function renderDone() {
+    const c = document.getElementById('demo-view-done');
+    if (demo.done.length === 0) {
+      c.innerHTML = `<div class="demo-section-title">${t('demo.done.title')}</div>
+        <div class="demo-empty">${t('demo.done.empty')}</div>`;
+      return;
+    }
+    // Group by "when"
+    const groups = {};
+    demo.done.forEach(it => {
+      const k = it.when || 'today';
+      (groups[k] = groups[k] || []).push(it);
+    });
+    const order = ['today', 'yesterday'];
+    const html = order.filter(k => groups[k]).map(k => `
+      <div class="demo-done-group">
+        <div class="demo-done-label">${k === 'today' ? t('demo.done.today') : t('demo.done.yesterday')}</div>
+        ${groups[k].map(renderDoneRow).join('')}
+      </div>`).join('');
+    c.innerHTML = `<div class="demo-section-title">${t('demo.done.title')}</div>${html}`;
+    bindRowInteractions(c, 'done');
+  }
+
+  function renderDoneRow(it) {
+    const hasMemos = (it.memos || []).length > 0;
+    return `
+      <div class="demo-done-item ${hasMemos ? 'has-memos' : ''}" data-id="${it.id}" data-list="done">
+        <div class="demo-done-dot"></div>
+        <div class="demo-done-body" data-act="open">${escapeHtml(it.text)}</div>
+        <div class="demo-hover-actions">
+          <div class="demo-hover-action" data-act="restore">${t('demo.action.restore')}</div>
+        </div>
+      </div>`;
+  }
+
+  function renderDemo() {
+    renderToday();
+    renderSomeday();
+    renderDone();
+    // If the canvas view was active but the target was wiped (e.g. after a
+    // language switch reseeded with new IDs), fall back to today.
+    if (demo.view === 'canvas' && !demo.canvas) demo.view = 'today';
+    if (demo.view === 'canvas') renderCanvas();
+    showView(demo.view);
+  }
+
+  function showView(name) {
+    demo.view = name;
+    ['today', 'someday', 'done', 'canvas'].forEach(v => {
+      document.getElementById('demo-view-' + v).classList.toggle('active', v === name);
+    });
+    document.querySelectorAll('.demo-nav-item').forEach(el => {
+      // Canvas isn't a top-level tab — leave all nav items inactive while there.
+      const isTopLevel = name !== 'canvas';
+      el.classList.toggle('active', isTopLevel && el.getAttribute('data-view') === name);
+    });
+  }
+
+  /* ─── Canvas (memo page) ─── */
+  function findItem(source, id) {
+    const list = source === 'today' ? demo.today
+               : source === 'someday' ? demo.someday
+               : demo.done;
+    return list.find(x => x.id === id);
+  }
+
+  function openCanvas(id, source) {
+    demo.canvas = { id, source };
+    demo.view = 'canvas';
+    renderCanvas();
+    showView('canvas');
+    // Autofocus the memo input when entering (except in Done — read-only).
+    if (source !== 'done') {
+      setTimeout(() => document.getElementById('demo-memo-input')?.focus(), 300);
+    }
+  }
+
+  function closeCanvas() {
+    const source = demo.canvas?.source || 'today';
+    demo.canvas = null;
+    demo.view = source;
+    // Re-render in case memo counts (dots) changed while in canvas.
+    renderSomeday();
+    renderDone();
+    showView(source);
+  }
+
+  function renderCanvas() {
+    if (!demo.canvas) return;
+    const { id, source } = demo.canvas;
+    const item = findItem(source, id);
+    const c = document.getElementById('demo-view-canvas');
+    if (!item) {
+      closeCanvas();
+      return;
+    }
+    const backLabel = source === 'today' ? t('demo.back.today')
+                    : source === 'someday' ? t('demo.back.someday')
+                    : t('demo.back.done');
+    const memos = item.memos || [];
+    const readOnly = source === 'done';
+
+    const memoList = memos.length
+      ? memos.map((m, i) => `
+          <div class="demo-memo">
+            <span class="demo-memo-bullet">·</span>
+            <span class="demo-memo-text">${escapeHtml(m)}</span>
+            ${readOnly ? '' : `<span class="demo-memo-delete" data-memo-idx="${i}">${t('demo.memo.delete')}</span>`}
+          </div>`).join('')
+      : `<div class="demo-canvas-empty">${readOnly ? '' : t('demo.memo.empty')}</div>`;
+
+    const input = readOnly ? '' : `
+      <div class="demo-memo-input-wrap">
+        <span class="demo-memo-bullet">+</span>
+        <input class="demo-memo-input" id="demo-memo-input"
+               placeholder="${t('demo.memo.placeholder')}" />
+      </div>`;
+
+    const titleEditable = readOnly ? '' : 'contenteditable="true" spellcheck="false"';
+    c.innerHTML = `
+      <button class="demo-canvas-back" id="demo-canvas-back">${backLabel}</button>
+      <div class="demo-canvas-title" id="demo-canvas-title" ${titleEditable}>${escapeHtml(item.text)}</div>
+      <div class="demo-canvas-underline"></div>
+      <div class="demo-memo-list">${memoList}</div>
+      ${input}
+    `;
+
+    document.getElementById('demo-canvas-back').addEventListener('click', closeCanvas);
+
+    // Title editing — commit on blur/Enter, empty reverts to original.
+    const titleEl = document.getElementById('demo-canvas-title');
+    if (titleEl && !readOnly) {
+      const original = item.text;
+      titleEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); }
+        else if (e.key === 'Escape') { titleEl.textContent = original; titleEl.blur(); }
+      });
+      titleEl.addEventListener('blur', () => {
+        const trimmed = titleEl.textContent.trim();
+        if (!trimmed) { titleEl.textContent = original; return; }
+        if (trimmed !== original) {
+          item.text = trimmed;
+          // Re-render the underlying list so the change is reflected on return.
+          if (source === 'today') renderToday();
+          else if (source === 'someday') renderSomeday();
+        }
+      });
+    }
+
+    // Memo deletion
+    c.querySelectorAll('.demo-memo-delete').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.getAttribute('data-memo-idx'), 10);
+        item.memos.splice(idx, 1);
+        renderCanvas();
+      });
+    });
+
+    // Memo input
+    const inp = document.getElementById('demo-memo-input');
+    if (inp) {
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const v = e.target.value.trim();
+          if (!v) return;
+          if (!item.memos) item.memos = [];
+          item.memos.push(v);
+          e.target.value = '';
+          renderCanvas();
+          setTimeout(() => document.getElementById('demo-memo-input')?.focus(), 0);
+        } else if (e.key === 'Escape') {
+          closeCanvas();
+        }
+      });
+    }
+  }
+
+  /* ─── Actions ─── */
+  function toggleToday(id) {
+    const it = demo.today.find(x => x.id === id);
+    if (!it) return;
+    it.done = !it.done;
+    // Quick DOM update — no re-render, keeps it smooth
+    const row = document.querySelector(`#demo-view-today .demo-task[data-id="${id}"]`);
+    if (row) {
+      row.classList.toggle('done', it.done);
+      row.querySelector('.demo-check').classList.toggle('checked', it.done);
+    }
+  }
+
+  function returnToSomeday(id) {
+    const idx = demo.today.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    const [it] = demo.today.splice(idx, 1);
+    it.done = false;
+    demo.someday.unshift({ id: it.id, text: it.text });
+    renderToday();
+    renderSomeday();
+  }
+
+  function promoteToToday(id) {
+    const idx = demo.someday.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    const [it] = demo.someday.splice(idx, 1);
+    demo.today.push({ id: it.id, text: it.text, done: false });
+    renderToday();
+    renderSomeday();
+  }
+
+  function completeFromSomeday(id) {
+    const idx = demo.someday.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    const [it] = demo.someday.splice(idx, 1);
+    demo.done.unshift({ id: it.id, text: it.text, when: 'today' });
+    renderSomeday();
+    renderDone();
+  }
+
+  function restoreFromDone(id) {
+    const idx = demo.done.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    const [it] = demo.done.splice(idx, 1);
+    demo.someday.unshift({ id: it.id, text: it.text });
+    renderSomeday();
+    renderDone();
+  }
+
+  function deleteItem(id, list) {
+    const arr = list === 'today' ? demo.today
+              : list === 'someday' ? demo.someday
+              : demo.done;
+    const idx = arr.findIndex(x => x.id === id);
+    if (idx < 0) return;
+    arr.splice(idx, 1);
+    if (list === 'today') renderToday();
+    else if (list === 'someday') renderSomeday();
+    else renderDone();
+  }
+
+  /* ─── Bind desktop hover + check actions ─── */
+  function bindRowInteractions(container, list) {
+    container.querySelectorAll('[data-act]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const row = el.closest('[data-id]');
+        if (!row) return;
+        const id = row.getAttribute('data-id');
+        const act = el.getAttribute('data-act');
+        if (act === 'toggle') toggleToday(id);
+        else if (act === 'toSomeday') returnToSomeday(id);
+        else if (act === 'toToday') promoteToToday(id);
+        else if (act === 'markDone') completeFromSomeday(id);
+        else if (act === 'restore') restoreFromDone(id);
+        else if (act === 'open') openCanvas(id, list);
+      });
+    });
+
+    // Mobile swipe
+    if (isMobileViewport()) {
+      container.querySelectorAll('.demo-swipe-wrap').forEach(wrap => bindSwipe(wrap, list));
+    }
+  }
+
+  /* ─── Swipe gesture (mobile) ─── */
+  function bindSwipe(wrap, list) {
+    const inner = wrap.querySelector('.demo-swipe-inner');
+    const bgLeft = wrap.querySelector('.demo-swipe-bg-left');
+    const bgRight = wrap.querySelector('.demo-swipe-bg-right');
+    const threshold = 80;
+    const activate = 6;
+
+    let startX = 0, startY = 0;
+    let dx = 0;
+    let active = false;
+    let decided = false;
+    let horizontal = false;
+    let pointerId = null;
+    let suppressClick = false;
+
+    // If a horizontal swipe has been committed, block the click that the
+    // browser fires after pointerup from bubbling up and opening the canvas.
+    inner.addEventListener('click', (e) => {
+      if (suppressClick) {
+        e.stopPropagation();
+        e.preventDefault();
+        suppressClick = false;
+      }
+    }, true);
+
+    const allowLeft = !!bgLeft;   // swipe right reveals left label → leading action
+    const allowRight = !!bgRight; // swipe left reveals right label → trailing action
+
+    const onDown = (e) => {
+      // Only primary button for mouse; right-click is the context menu.
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      pointerId = e.pointerId;
+      startX = e.clientX;
+      startY = e.clientY;
+      dx = 0;
+      active = true;
+      decided = false;
+      horizontal = false;
+      // Capture: keep receiving move/up even when the cursor leaves this row
+      // or the window. Without this, fast drags "stick" mid-swipe.
+      try { inner.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+
+    const onMove = (e) => {
+      if (!active || e.pointerId !== pointerId) return;
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      if (!decided) {
+        if (Math.abs(deltaX) < activate && Math.abs(deltaY) < activate) return;
+        decided = true;
+        horizontal = Math.abs(deltaX) > Math.abs(deltaY);
+      }
+      if (!horizontal) return;
+      e.preventDefault();
+      if (deltaX > 0 && !allowLeft) return;
+      if (deltaX < 0 && !allowRight) return;
+      dx = deltaX;
+      inner.style.transform = `translateX(${dx}px)`;
+      if (bgLeft) bgLeft.style.opacity = Math.max(0, Math.min(1, dx / threshold));
+      if (bgRight) bgRight.style.opacity = Math.max(0, Math.min(1, -dx / threshold));
+    };
+
+    const flyAndRun = (dir, action) => {
+      inner.style.transition = 'transform 0.22s ease-out';
+      inner.style.transform = `translateX(${dir * 600}px)`;
+      setTimeout(() => {
+        inner.style.transition = '';
+        inner.style.transform = '';
+        if (bgLeft) bgLeft.style.opacity = 0;
+        if (bgRight) bgRight.style.opacity = 0;
+        action();
+      }, 220);
+    };
+
+    const snapBack = () => {
+      inner.style.transition = 'transform 0.28s cubic-bezier(0.2, 0.7, 0.3, 1)';
+      inner.style.transform = '';
+      if (bgLeft) bgLeft.style.opacity = 0;
+      if (bgRight) bgRight.style.opacity = 0;
+      setTimeout(() => { inner.style.transition = ''; }, 300);
+    };
+
+    const onUp = (e) => {
+      if (!active || e.pointerId !== pointerId) return;
+      active = false;
+      try { inner.releasePointerCapture(pointerId); } catch (_) {}
+      const wasHorizontal = horizontal;
+      const id = wrap.getAttribute('data-id');
+
+      if (!wasHorizontal) {
+        // tap — let the click fall through (opens canvas, toggles check, etc.)
+        snapBack();
+        return;
+      }
+
+      // Horizontal drag happened: block the trailing click so the user
+      // doesn't accidentally open canvas after swiping.
+      suppressClick = true;
+
+      if (dx > threshold && allowLeft) {
+        if (list === 'today') flyAndRun(1, () => returnToSomeday(id));
+        else if (list === 'someday') flyAndRun(1, () => completeFromSomeday(id));
+        else snapBack();
+      } else if (dx < -threshold && allowRight) {
+        if (list === 'someday') flyAndRun(-1, () => promoteToToday(id));
+        else snapBack();
+      } else {
+        snapBack();
+      }
+    };
+
+    inner.addEventListener('pointerdown', onDown);
+    inner.addEventListener('pointermove', onMove);
+    inner.addEventListener('pointerup', onUp);
+    inner.addEventListener('pointercancel', onUp);
+    // Safety net — if something strips capture (devtools, parent listeners),
+    // a lost-capture event still resets state cleanly.
+    inner.addEventListener('lostpointercapture', (e) => {
+      if (!active || e.pointerId !== pointerId) return;
+      active = false;
+      if (horizontal) suppressClick = true;
+      snapBack();
+    });
+  }
+
+  /* ─── Context menu (right-click desktop / long-press touch) ─── */
+  // Mirrors the Tauri app's ctx-menu and the iOS SwiftUI .contextMenu:
+  // a small floating "Delete" anchored to the pointer, dismissed by
+  // outside click, scroll, escape, or blur.
+  (function bindDemoContextMenu() {
+    const menu = document.getElementById('demo-ctx-menu');
+    const deleteBtn = document.getElementById('demo-ctx-delete');
+    const win = document.getElementById('demo-window');
+    if (!menu || !deleteBtn || !win) return;
+    let target = null; // { id, list }
+
+    function rowCtx(el) {
+      const row = el && el.closest('[data-id][data-list]');
+      if (!row || !win.contains(row)) return null;
+      return { id: row.dataset.id, list: row.dataset.list };
+    }
+
+    function open(x, y, ctx) {
+      target = ctx;
+      deleteBtn.textContent = t('demo.memo.delete');
+      menu.classList.add('visible');
+      // Offset so the menu sits just below-right of the pointer/finger.
+      // Horizontal gap needs to be tighter than vertical because the menu's
+      // own padding already adds visual whitespace on the left edge.
+      const OFFSET_X = -8;
+      const OFFSET_Y = 4;
+      const rect = menu.getBoundingClientRect();
+      let left = x + OFFSET_X;
+      let top = y + OFFSET_Y;
+      if (left + rect.width > window.innerWidth - 8) left = Math.max(8, x - rect.width - OFFSET_X);
+      if (top + rect.height > window.innerHeight - 8) top = Math.max(8, y - rect.height - OFFSET_Y);
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+    }
+
+    function close() {
+      menu.classList.remove('visible');
+      target = null;
+    }
+
+    // Desktop right-click (also fires on mobile emulators that honour
+    // the contextmenu event).
+    win.addEventListener('contextmenu', (e) => {
+      const ctx = rowCtx(e.target);
+      if (!ctx) { close(); return; }
+      e.preventDefault();
+      open(e.clientX, e.clientY, ctx);
+    });
+
+    // Long-press — mirrors iOS .contextMenu. Cancels on move (so a swipe
+    // gesture still wins) or early release.
+    const LONG_PRESS_MS = 500;
+    const MOVE_SLOP = 8;
+    let pressTimer = null;
+    let pressStart = null;
+    let pressCtx = null;
+    let suppressNextClick = false;
+
+    function clearPress() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      pressStart = null;
+      pressCtx = null;
+    }
+
+    win.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      const ctx = rowCtx(e.target);
+      if (!ctx) return;
+      pressStart = { x: e.clientX, y: e.clientY };
+      pressCtx = ctx;
+      pressTimer = setTimeout(() => {
+        if (!pressCtx) return;
+        // Block the next click so the canvas doesn't open on release.
+        suppressNextClick = true;
+        open(pressStart.x, pressStart.y, pressCtx);
+        pressTimer = null;
+      }, LONG_PRESS_MS);
+    }, true);
+
+    win.addEventListener('pointermove', (e) => {
+      if (!pressStart) return;
+      const dx = e.clientX - pressStart.x;
+      const dy = e.clientY - pressStart.y;
+      if (Math.abs(dx) > MOVE_SLOP || Math.abs(dy) > MOVE_SLOP) clearPress();
+    }, true);
+
+    win.addEventListener('pointerup', clearPress, true);
+    win.addEventListener('pointercancel', clearPress, true);
+
+    // Swallow the click that follows a long-press so we don't open canvas.
+    // Exempts the menu itself so Delete taps still register.
+    win.addEventListener('click', (e) => {
+      if (!suppressNextClick) return;
+      if (e.target.closest('#demo-ctx-menu')) { suppressNextClick = false; return; }
+      e.stopPropagation();
+      e.preventDefault();
+      suppressNextClick = false;
+    }, true);
+
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!target) { close(); return; }
+      const { id, list } = target;
+      close();
+      deleteItem(id, list);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!menu.classList.contains('visible')) return;
+      if (e.target.closest('#demo-ctx-menu')) return;
+      close();
+    });
+
+    document.addEventListener('scroll', close, true);
+    window.addEventListener('blur', close);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+  })();
+
+  /* ─── Nav bindings ─── */
+  document.querySelectorAll('.demo-nav-item').forEach(el => {
+    el.addEventListener('click', () => showView(el.getAttribute('data-view')));
+  });
+
+  /* ─── Viewport mode toggle (Desktop / Mobile) ─── */
+  function applyViewportMode() {
+    const section = document.querySelector('.demo-section');
+    const autoMobile = window.matchMedia('(max-width: 760px)').matches;
+    const effective = viewportOverride || (autoMobile ? 'mobile' : 'desktop');
+
+    section.classList.toggle('force-mobile', viewportOverride === 'mobile');
+    section.classList.toggle('force-desktop', viewportOverride === 'desktop');
+
+    document.querySelectorAll('.viewport-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-viewport') === effective);
+    });
+  }
+
+  let wasMobile = isMobileViewport();
+
+  document.querySelectorAll('.viewport-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.getAttribute('data-viewport');
+      const autoMobile = window.matchMedia('(max-width: 760px)').matches;
+      // If user picks the mode that already matches their viewport, clear override
+      viewportOverride = ((mode === 'mobile' && autoMobile) ||
+                          (mode === 'desktop' && !autoMobile)) ? null : mode;
+      wasMobile = isMobileViewport();
+      applyViewportMode();
+      renderDemo();
+      updateDemoMeta();
+    });
+  });
+
+  /* ─── Re-render on viewport cross-over ─── */
+  window.addEventListener('resize', () => {
+    const nowMobile = isMobileViewport();
+    if (nowMobile !== wasMobile) {
+      wasMobile = nowMobile;
+      renderDemo();
+      updateDemoMeta();
+    }
+    applyViewportMode();
+  });
+
+  applyViewportMode();
+
+  /* ═══════════════════════════════════════════════════════
+     Theme toggle
+     ═══════════════════════════════════════════════════════ */
+  const THEME_KEY = 'onu.theme';
+
+  function savedTheme() {
+    try {
+      const v = localStorage.getItem(THEME_KEY);
+      return (v === 'dark' || v === 'light') ? v : null;
+    } catch (e) { return null; }
+  }
+
+  function systemPrefersLight() {
+    return window.matchMedia('(prefers-color-scheme: light)').matches;
+  }
+
+  function effectiveTheme() {
+    return savedTheme() || (systemPrefersLight() ? 'light' : 'dark');
+  }
+
+  function applyTheme() {
+    const override = savedTheme();
+    const root = document.documentElement;
+    if (override) root.setAttribute('data-theme', override);
+    else root.removeAttribute('data-theme');
+    root.classList.toggle('theme-light-pref', systemPrefersLight());
+    const btn = document.getElementById('theme-toggle');
+    if (btn) btn.setAttribute('data-mode', effectiveTheme());
+  }
+
+  function toggleTheme() {
+    // Briefly enable a universal colour transition so every element
+    // — header, demo window, text, buttons — crossfades together.
+    const root = document.documentElement;
+    root.classList.add('theme-transitioning');
+    const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+    applyTheme();
+    setTimeout(() => root.classList.remove('theme-transitioning'), 400);
+  }
+
+  // React to system theme changes — only if the user hasn't set a preference.
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (!savedTheme()) applyTheme();
+  });
+
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+  applyTheme();
+
+  /* ─── Init ─── */
+  setLang(initialLang);
+</script>
+</body>
+</html>
